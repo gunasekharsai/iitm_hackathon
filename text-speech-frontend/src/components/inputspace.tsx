@@ -1,32 +1,42 @@
 import React, { useState } from "react";
+import AudioPlayer from "./Audioplayer";
 
 const InputSpace: React.FC = () => {
   const [text, setText] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(false);
-  const [audioBuffer, setAudioBuffer] = useState<AudioBuffer | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [responsedata, setResponseData] = useState<null>(null)
 
-  // Initialize audio context
+
+  // initalizeing audio context to expose the audio file
   const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
 
-  // Load audio function
+
+  // to load the audio
+
   async function loadAudio(audioData: ArrayBuffer) {
     try {
-      const buffer = await audioContext.decodeAudioData(audioData);
-      return buffer;
+      const audioBuffer = await audioContext.decodeAudioData(audioData);
+      return audioBuffer;
     } catch (error) {
       console.error('Error decoding audio data:', error);
       throw error;
     }
   }
+  
 
-  // Play audio function
-  function playAudio(buffer: AudioBuffer) {
+  // to play the audio
+
+  function playAudio(audioBuffer: AudioBuffer) {
     const source = audioContext.createBufferSource();
-    source.buffer = buffer;
+    source.buffer = audioBuffer;
     source.connect(audioContext.destination);
     source.start(0);
   }
+  
+
+
+
 
   const handleSubmit = async () => {
     try {
@@ -53,32 +63,28 @@ const InputSpace: React.FC = () => {
 
       setLoading(true);
       setError(null);
+      console.log("before fetch")
 
-      const response = await fetch("https://api.sarvam.ai/text-to-speech", options);
-      const jsonData = await response.json();
+      const response = await fetch(
+        "https://api.sarvam.ai/text-to-speech",
+        options
+      );
 
-      if (response.ok && jsonData.audio) {
-        // Decode base64 audio data
-        console.log("1")
-        const audioData = atob(jsonData.audio);
-        console.log("2")
-        const arrayBuffer = new ArrayBuffer(audioData.length);
-        console.log("3")
-        const uintArray = new Uint8Array(arrayBuffer);
-        console.log("4")
-        for (let i = 0; i < audioData.length; i++) {
-          uintArray[i] = audioData.charCodeAt(i);
-        }
-        console.log("5")
 
-        // Load and set the audio buffer
-        const buffer = await loadAudio(arrayBuffer);
-        
-        console.log("6")
-        setAudioBuffer(buffer);
+      const data = await response.json();
+      console.log(data);
+    
+      if (data.audios && data.audios.length > 0) {
+        setResponseData(data);
       } else {
-        setError(jsonData.error || "An error occurred");
+        throw new Error('No audio data found in response');
       }
+     
+    //   if (response.ok) {
+    //     setAudioUrl(data.audio_file);
+    //   } else {
+    //     setError(data.error || "An error occurred");
+    //   }
     } catch (e) {
       setError(e instanceof Error ? e.message : "An unexpected error occurred");
     } finally {
@@ -100,11 +106,15 @@ const InputSpace: React.FC = () => {
         {loading ? "Converting..." : "Convert to Speech"}
       </button>
 
-      {loading && <p>Loading...</p>}
-      {error && <p style={{ color: "red" }}>{error}</p>}
-      {audioBuffer && (
-        <button onClick={() => playAudio(audioBuffer)}>Play Audio</button>
-      )}
+      {responsedata && responsedata.audios.map((audioData: string, index: number) => (
+        <div key={index} className="mb-6 p-4 border rounded">
+          <h3 className="font-bold mb-2">Audio {index + 1}</h3>
+          <AudioPlayer base64Data={audioData} />
+        </div>
+      ))}
+
+     
+      
     </div>
   );
 };
